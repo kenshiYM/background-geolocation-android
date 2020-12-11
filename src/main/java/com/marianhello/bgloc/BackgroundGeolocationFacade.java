@@ -229,7 +229,7 @@ public class BackgroundGeolocationFacade {
         }
 
         PermissionManager permissionManager = PermissionManager.getInstance(getContext());
-        permissionManager.checkPermissions(Arrays.asList(PERMISSIONS), new PermissionManager.PermissionRequestListener() {
+        permissionManager.checkPermissions(Arrays.asList(PERMISSIONSNEW), new PermissionManager.PermissionRequestListener() {
             @Override
             public void onPermissionGranted() {
                 logger.info("User granted requested permissions");
