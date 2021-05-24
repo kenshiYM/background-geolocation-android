@@ -3,6 +3,7 @@ package com.marianhello.bgloc;
 import android.Manifest;
 import android.accounts.Account;
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -14,7 +15,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
-import android.support.v4.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
 
@@ -53,14 +55,14 @@ public class BackgroundGeolocationFacade {
     public static final int AUTHORIZATION_DENIED = 0;
 
     public static final String[] PERMISSIONS = {
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-        Manifest.permission.ACCESS_FINE_LOCATION
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
     };
 
     public static final String[] PERMISSIONS10 = {
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION
     };
 
     private String[] PERMISSIONSNEW = PERMISSIONS;
@@ -73,15 +75,17 @@ public class BackgroundGeolocationFacade {
     private final Context mContext;
     private final PluginDelegate mDelegate;
     private final LocationService mService;
+    private final Activity mActivity;
 
     private BackgroundLocation mStationaryLocation;
 
     private org.slf4j.Logger logger;
 
-    public BackgroundGeolocationFacade(Context context, PluginDelegate delegate) {
+    public BackgroundGeolocationFacade(Context context, PluginDelegate delegate, Activity activity) {
         mContext = context;
         mDelegate = delegate;
         mService = new LocationServiceProxy(context);
+        mActivity = activity;
 
         UncaughtExceptionLogger.register(context.getApplicationContext());
 
@@ -219,34 +223,64 @@ public class BackgroundGeolocationFacade {
         mServiceBroadcastReceiverRegistered = false;
     }
 
-    public void start() {
+    public void checkForegroundLocationPermission() {
+        logger.debug("Checking foreground permission");
+        boolean isFineLocationGranted = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        if (isFineLocationGranted) {
+            mDelegate.onPermissionChanged("foreground_enabled");
+        } else if (ActivityCompat.shouldShowRequestPermissionRationale(mActivity, Manifest.permission.ACCESS_FINE_LOCATION)) {
+            mDelegate.onPermissionChanged("foreground_disabled");
+        } else {
+            mDelegate.onPermissionChanged("foreground_disabled");
+        }
+    }
+
+    public void checkBackgroundLocationPermission() {
+        logger.debug("Checking background permission");
+        boolean isBackgroundLocationGranted = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        if (isBackgroundLocationGranted) {
+            mDelegate.onPermissionChanged("background_enabled");
+        } else if (ActivityCompat.shouldShowRequestPermissionRationale(mActivity, Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            mDelegate.onPermissionChanged("background_disabled");
+        } else {
+            mDelegate.onPermissionChanged("background_disabled");
+        }
+    }
+
+    public void start(boolean skipPermissionCheck) {
         logger.debug("Starting service");
 
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-            PERMISSIONSNEW = PERMISSIONS;
+        if (skipPermissionCheck) {
+            registerLocationModeChangeReceiver();
+            registerServiceBroadcast();
+            startBackgroundService();
         } else {
-            PERMISSIONSNEW = PERMISSIONS10;
-        }
-
-        PermissionManager permissionManager = PermissionManager.getInstance(getContext());
-        permissionManager.checkPermissions(Arrays.asList(PERMISSIONSNEW), new PermissionManager.PermissionRequestListener() {
-            @Override
-            public void onPermissionGranted() {
-                logger.info("User granted requested permissions");
-                // watch location mode changes
-                registerLocationModeChangeReceiver();
-                registerServiceBroadcast();
-                startBackgroundService();
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                PERMISSIONSNEW = PERMISSIONS;
+            } else {
+                PERMISSIONSNEW = PERMISSIONS10;
             }
 
-            @Override
-            public void onPermissionDenied() {
-                logger.info("User denied requested permissions");
-                if (mDelegate != null) {
-                    mDelegate.onAuthorizationChanged(BackgroundGeolocationFacade.AUTHORIZATION_DENIED);
+            PermissionManager permissionManager = PermissionManager.getInstance(getContext());
+            permissionManager.checkPermissions(Arrays.asList(PERMISSIONSNEW), new PermissionManager.PermissionRequestListener() {
+                @Override
+                public void onPermissionGranted() {
+                    logger.info("User granted requested permissions");
+                    // watch location mode changes
+                    registerLocationModeChangeReceiver();
+                    registerServiceBroadcast();
+                    startBackgroundService();
                 }
-            }
-        });
+
+                @Override
+                public void onPermissionDenied() {
+                    logger.info("User denied requested permissions");
+                    if (mDelegate != null) {
+                        mDelegate.onAuthorizationChanged(BackgroundGeolocationFacade.AUTHORIZATION_DENIED);
+                    }
+                }
+            });
+        }
     }
 
     public void stop() {

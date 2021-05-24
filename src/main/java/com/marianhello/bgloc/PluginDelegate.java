@@ -16,4 +16,5 @@ public interface PluginDelegate {
     void onAbortRequested();
     void onHttpAuthorization();
     void onError(PluginException error);
+    void onPermissionChanged(String status);
 }
