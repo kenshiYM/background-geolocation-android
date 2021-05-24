@@ -75,17 +75,15 @@ public class BackgroundGeolocationFacade {
     private final Context mContext;
     private final PluginDelegate mDelegate;
     private final LocationService mService;
-    private final Activity mActivity;
 
     private BackgroundLocation mStationaryLocation;
 
     private org.slf4j.Logger logger;
 
-    public BackgroundGeolocationFacade(Context context, PluginDelegate delegate, Activity activity) {
+    public BackgroundGeolocationFacade(Context context, PluginDelegate delegate) {
         mContext = context;
         mDelegate = delegate;
         mService = new LocationServiceProxy(context);
-        mActivity = activity;
 
         UncaughtExceptionLogger.register(context.getApplicationContext());
 
@@ -221,30 +219,6 @@ public class BackgroundGeolocationFacade {
         }
 
         mServiceBroadcastReceiverRegistered = false;
-    }
-
-    public void checkForegroundLocationPermission() {
-        logger.debug("Checking foreground permission");
-        boolean isFineLocationGranted = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-        if (isFineLocationGranted) {
-            mDelegate.onPermissionChanged("foreground_enabled");
-        } else if (ActivityCompat.shouldShowRequestPermissionRationale(mActivity, Manifest.permission.ACCESS_FINE_LOCATION)) {
-            mDelegate.onPermissionChanged("foreground_disabled");
-        } else {
-            mDelegate.onPermissionChanged("foreground_disabled");
-        }
-    }
-
-    public void checkBackgroundLocationPermission() {
-        logger.debug("Checking background permission");
-        boolean isBackgroundLocationGranted = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
-        if (isBackgroundLocationGranted) {
-            mDelegate.onPermissionChanged("background_enabled");
-        } else if (ActivityCompat.shouldShowRequestPermissionRationale(mActivity, Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-            mDelegate.onPermissionChanged("background_disabled");
-        } else {
-            mDelegate.onPermissionChanged("background_disabled");
-        }
     }
 
     public void start(boolean skipPermissionCheck) {

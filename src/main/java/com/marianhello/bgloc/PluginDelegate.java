@@ -2,6 +2,7 @@ package com.marianhello.bgloc;
 
 import com.marianhello.bgloc.data.BackgroundActivity;
 import com.marianhello.bgloc.data.BackgroundLocation;
+import com.marianhello.bgloc.data.PermissionStatus;
 
 /**
  * Created by finch on 27.11.2017.
@@ -16,5 +17,5 @@ public interface PluginDelegate {
     void onAbortRequested();
     void onHttpAuthorization();
     void onError(PluginException error);
-    void onPermissionChanged(String status);
+    void onPermissionChanged(PermissionStatus permissionStatus);
 }
