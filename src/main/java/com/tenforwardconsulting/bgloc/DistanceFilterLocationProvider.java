@@ -21,6 +21,7 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 
 import com.marianhello.bgloc.Config;
@@ -190,22 +191,29 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
             } else {
                 isAcquiringStationaryLocation = true;
             }
-
+            showDebugToast("setPace: isAcuiringSpeed:" + isAcquiringSpeed + "isAcquiringStationaryLocation:" + isAcquiringStationaryLocation);
             // Temporarily turn on super-aggressive geolocation on all providers when acquiring velocity or stationary location.
             if (isAcquiringSpeed || isAcquiringStationaryLocation) {
                 locationAcquisitionAttempts = 0;
                 // Turn on each provider aggressively for a short period of time
                 List<String> matchingProviders = locationManager.getAllProviders();
                 for (String provider: matchingProviders) {
+                    showDebugToast("setPace: use provider:" + provider);
                     if (provider != LocationManager.PASSIVE_PROVIDER) {
                         locationManager.requestLocationUpdates(provider, 0, 0, this);
                     }
                 }
             } else {
-                locationManager.requestLocationUpdates(locationManager.getBestProvider(criteria, true), mConfig.getInterval(), scaledDistanceFilter, this);
+                String provider = locationManager.getBestProvider(criteria, true);
+                if (locationManager.getAllProviders().contains(LocationManager.GPS_PROVIDER) && Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
+                    provider = LocationManager.GPS_PROVIDER;
+                }
+                showDebugToast("setPace: use provider:" + provider);
+                locationManager.requestLocationUpdates(provider, mConfig.getInterval(), scaledDistanceFilter, this);
             }
         } catch (SecurityException e) {
             logger.error("Security exception: {}", e.getMessage());
+            showDebugToast("Security exception: " + e.getMessage());
             this.handleSecurityException(e);
         }
     }

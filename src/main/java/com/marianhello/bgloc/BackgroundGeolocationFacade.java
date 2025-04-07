@@ -17,7 +17,7 @@ import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import android.text.TextUtils;
 
 import com.github.jparkie.promise.Promise;
@@ -54,19 +54,16 @@ public class BackgroundGeolocationFacade {
     public static final int AUTHORIZATION_AUTHORIZED = 1;
     public static final int AUTHORIZATION_DENIED = 0;
 
-    public static final String[] PERMISSIONS = {
+    public static final String[] FRONT_PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
+    };
+
+    public static final String[] BACKGROUND_PERMISSIONS = {
             Manifest.permission.ACCESS_BACKGROUND_LOCATION
     };
 
-    public static final String[] PERMISSIONS10 = {
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION
-    };
-
-    private String[] PERMISSIONSNEW = PERMISSIONS;
+    private String[] PERMISSIONSNEW = FRONT_PERMISSIONS;
 
     private boolean mServiceBroadcastReceiverRegistered = false;
     private boolean mLocationModeChangeReceiverRegistered = false;
@@ -230,26 +227,46 @@ public class BackgroundGeolocationFacade {
             registerServiceBroadcast();
             startBackgroundService();
         } else {
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-                PERMISSIONSNEW = PERMISSIONS;
-            } else {
-                PERMISSIONSNEW = PERMISSIONS10;
-            }
-
-            PermissionManager permissionManager = PermissionManager.getInstance(getContext());
-            permissionManager.checkPermissions(Arrays.asList(PERMISSIONSNEW), new PermissionManager.PermissionRequestListener() {
+            PermissionManager frontPermissionManager = PermissionManager.getInstance(getContext());
+            frontPermissionManager.checkPermissions(Arrays.asList(FRONT_PERMISSIONS), new PermissionManager.PermissionRequestListener() {
                 @Override
                 public void onPermissionGranted() {
-                    logger.info("User granted requested permissions");
+                    logger.info("User granted requested front permissions");
                     // watch location mode changes
-                    registerLocationModeChangeReceiver();
-                    registerServiceBroadcast();
-                    startBackgroundService();
+                    // registerLocationModeChangeReceiver();
+                    // registerServiceBroadcast();
+                    // startBackgroundService();
+                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                        // watch location mode changes
+                        registerLocationModeChangeReceiver();
+                        registerServiceBroadcast();
+                        startBackgroundService();
+                    } else {
+                        PermissionManager backgroundPermissionManager = PermissionManager.getInstance(getContext());
+                        backgroundPermissionManager.checkPermissions(Arrays.asList(BACKGROUND_PERMISSIONS), new PermissionManager.PermissionRequestListener() {
+                            @Override
+                            public void onPermissionGranted() {
+                                logger.info("User granted requested background permissions");
+                                // watch location mode changes
+                                registerLocationModeChangeReceiver();
+                                registerServiceBroadcast();
+                                startBackgroundService();
+                            }
+
+                            @Override
+                            public void onPermissionDenied() {
+                                logger.info("User denied requested background permissions");
+                                if (mDelegate != null) {
+                                    mDelegate.onAuthorizationChanged(BackgroundGeolocationFacade.AUTHORIZATION_DENIED);
+                                }
+                            }
+                        });
+                    }
                 }
 
                 @Override
                 public void onPermissionDenied() {
-                    logger.info("User denied requested permissions");
+                    logger.info("User denied requested front permissions");
                     if (mDelegate != null) {
                         mDelegate.onAuthorizationChanged(BackgroundGeolocationFacade.AUTHORIZATION_DENIED);
                     }
@@ -432,7 +449,7 @@ public class BackgroundGeolocationFacade {
     }
 
     public boolean hasPermissions() {
-        return hasPermissions(getContext(), PERMISSIONS);
+        return hasPermissions(getContext(), FRONT_PERMISSIONS);
     }
 
     public boolean locationServicesEnabled() throws PluginException {
